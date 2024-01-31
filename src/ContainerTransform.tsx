@@ -256,31 +256,37 @@ const ContainerTransformContent = React.forwardRef<
         }
 
         const initialTransitionProps = {
-            transform: `translateX(${context.rects[0]?.x}px) translateY(${context.rects[0]?.y}px) translateY(0)`,
+            // @ts-ignore weird type error
+            top: 0,
+            left: 0,
             width: context.rects[0]?.width,
             height: context.rects[0]?.height,
-            backgroundColor: triggerComputedStyle.backgroundColor,
-            borderRadius: triggerComputedStyle.borderRadius,
+            transform: `translateX(${context.rects[0]?.x}px) translateY(${context.rects[0]?.y}px) translateY(0)`,
             padding: triggerComputedStyle.padding,
-            left: 0,
-            top: 0,
+            backgroundColor: triggerComputedStyle.backgroundColor ?? "rgb(0,0,0,0)",
+            borderRadius: triggerComputedStyle.borderRadius,
         } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["initial"];
 
         const contentTransitionProps = {
-            transform: `translateX(${context.rects[1]?.x}px) translateY(${context.rects[1]?.y}px) translateY(0)`,
+            // @ts-ignore weird type error
+            top: 0,
+            left: 0,
             width: context.rects[1]?.width,
             height: context.rects[1]?.height,
-            backgroundColor: contentComputedStyle.backgroundColor,
-            borderRadius: contentComputedStyle.borderRadius,
+            transform: `translateX(${context.rects[1]?.x}px) translateY(${context.rects[1]?.y}px) translateY(0)`,
             padding: contentComputedStyle.padding,
-            left: 0,
-            top: 0,
+            backgroundColor: contentComputedStyle.backgroundColor ?? "rgb(0,0,0,0)",
+            borderRadius: contentComputedStyle.borderRadius,
         } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["animate"];
 
         const animationKeyframes = {
+            // @ts-ignore weird type error
+            top: [initialTransitionProps.top, contentTransitionProps.top],
+            left: [initialTransitionProps.left, contentTransitionProps.left],
             width: [initialTransitionProps.width, contentTransitionProps.width],
             height: [initialTransitionProps.height, contentTransitionProps.height],
             transform: [initialTransitionProps.transform, contentTransitionProps.transform],
+            padding: [initialTransitionProps.padding, contentTransitionProps.padding],
             backgroundColor: [
                 initialTransitionProps.backgroundColor,
                 contentTransitionProps.backgroundColor,
@@ -289,9 +295,6 @@ const ContainerTransformContent = React.forwardRef<
                 initialTransitionProps.borderRadius,
                 contentTransitionProps.borderRadius,
             ],
-            padding: [initialTransitionProps.padding, contentTransitionProps.padding],
-            top: [0, 0],
-            left: [0, 0],
         } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["animate"];
 
         const styles = React.useMemo(
@@ -361,24 +364,35 @@ const ContainerTransformContentMask = React.memo(
     }: {
         triggerBackgroundColor: string | undefined;
         contentBackgroundColor: string | undefined;
-    }) => (
-        <motion.div
-            key="container-transform-content-mask"
-            data-container-transform-content-mask=""
-            initial={{ opacity: 1, backgroundColor: triggerBackgroundColor ?? "rgb(0,0,0,0)" }}
-            animate={{
-                opacity: 0,
-                backgroundColor: contentBackgroundColor ?? "rgb(0,0,0,0)",
-            }}
-            exit={{ opacity: 1, backgroundColor: triggerBackgroundColor ?? "rgb(0,0,0,0)" }}
-            style={visibleOnlyStyles}
-            transition={{
-                ease: EASINGS.emphasized,
-                duration: DURATIONS.emphasized,
-            }}
-            aria-hidden="true"
-        />
-    )
+    }) => {
+        return (
+            <motion.div
+                key="container-transform-content-mask"
+                data-container-transform-content-mask=""
+                initial={{
+                    opacity: 1,
+                    // @ts-ignore weird type error
+                    backgroundColor: triggerBackgroundColor ?? "rgb(0,0,0,0)",
+                }}
+                animate={{
+                    opacity: 0,
+                    // @ts-ignore weird type error
+                    backgroundColor: contentBackgroundColor ?? "rgb(0,0,0,0)",
+                }}
+                exit={{
+                    opacity: 1,
+                    // @ts-ignore weird type error
+                    backgroundColor: triggerBackgroundColor ?? "rgb(0,0,0,0)",
+                }}
+                style={visibleOnlyStyles}
+                transition={{
+                    ease: EASINGS.emphasized,
+                    duration: DURATIONS.emphasized,
+                }}
+                aria-hidden="true"
+            />
+        );
+    }
 );
 ContainerTransformContentMask.displayName = CONTENT_MASK_NAME;
 
