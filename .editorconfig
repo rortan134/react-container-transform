@@ -2,7 +2,6 @@
 # top-most EditorConfig file
 root = true
 
-# Every File
 [*]
 end_of_line = lf
 insert_final_newline = true

@@ -130,13 +130,7 @@ const ContainerTransformTrigger = React.forwardRef<
     }, [context.contentMaskRef]);
 
     return (
-        <Slot
-            {...props}
-            ref={composedTriggerRef}
-            style={styles}
-            // TODO: maybe manage internal state instead of controlled?
-            // onClick={composeEventHandlers(props.onClick, context.onActiveToggle)}
-        >
+        <Slot {...props} ref={composedTriggerRef} style={styles}>
             <Slottable>{children}</Slottable>
             <div
                 // This div is used to get the trigger position and size in an absolute position reference
@@ -182,7 +176,9 @@ const ContainerTransformPortal: React.FC<ContainerTransformPortalProps> = ({
     useContainerContext(PORTAL_NAME, __scopeContainer);
     return React.Children.map(children, (child) => (
         <PortalPrimitive container={container}>
-            <AnimatePresence initial={false} mode="popLayout">{child}</AnimatePresence>
+            <AnimatePresence initial={false} mode="popLayout">
+                {child}
+            </AnimatePresence>
         </PortalPrimitive>
     ));
 };

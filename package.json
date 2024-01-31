@@ -1,10 +1,14 @@
 {
     "name": "react-container-transform",
-    "version": "0.1.0",
-    "description": "",
+    "version": "0.0.1",
+    "description": "React container transform transition",
     "keywords": [
         "react",
-        "animation",
+        "react animation",
+        "transition",
+        "shared transition",
+        "shared element transition",
+        "container transform",
         "framer"
     ],
     "homepage": "https://github.com/rortan134/react-container-transform/",
@@ -27,12 +31,12 @@
             "default": "./dist/index.js"
         }
     },
-    "main": "./dist/index.js",
-    "module": "./dist/index.mjs",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/cjs/index.js",
+    "module": "./dist/es/index.mjs",
+    "types": "./dist/cjs/index.d.ts",
     "files": [
         "dist",
-        "README.md"
+        "*.md"
     ],
     "scripts": {
         "build": "bunchee",
@@ -40,6 +44,7 @@
         "dev": "bunchee --watch",
         "dev:test": "turbo run dev --filter=test...",
         "format": "prettier --write .",
+        "prepare": "husky install",
         "test": "vitest run",
         "test:e2e": "playwright test"
     },
@@ -52,32 +57,32 @@
     "dependencies": {
         "@radix-ui/react-slot": "^1.0.2",
         "client-only": "^0.0.1",
-        "framer-motion": "^10.18.0"
+        "framer-motion": "^11.0.3"
     },
     "devDependencies": {
-        "@playwright/test": "^1.40.1",
-        "@testing-library/jest-dom": "^6.2.0",
-        "@testing-library/react": "^14.1.2",
-        "@types/react": "^18.2.46",
-        "@typescript-eslint/eslint-plugin": "^6.11.0",
-        "@typescript-eslint/parser": "^6.11.0",
-        "bunchee": "^4.2.11",
-        "eslint": "^7.32.0",
+        "@playwright/test": "^1.41.1",
+        "@testing-library/jest-dom": "^6.4.0",
+        "@testing-library/react": "^14.2.0",
+        "@types/react": "^18.2.48",
+        "@typescript-eslint/eslint-plugin": "^6.20.0",
+        "@typescript-eslint/parser": "^6.20.0",
+        "bunchee": "^4.4.3",
+        "eslint": "^8.56.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-plugin-jest-dom": "^5.1.0",
-        "eslint-plugin-playwright": "^0.21.0",
+        "eslint-plugin-playwright": "^0.22.1",
         "eslint-plugin-react": "^7.33.2",
         "eslint-plugin-react-hooks": "^4.6.0",
         "eslint-plugin-testing-library": "^6.2.0",
-        "husky": "^8.0.3",
-        "lint-staged": "^15.2.0",
-        "prettier": "^2.8.8",
-        "prettier-plugin-packagejson": "^2.4.9",
+        "husky": "^9.0.7",
+        "lint-staged": "^15.2.1",
+        "prettier": "^3.2.4",
+        "prettier-plugin-packagejson": "^2.4.10",
         "react": "18.2.0",
         "react-dom": "18.2.0",
-        "turbo": "1.6",
-        "typescript": "5.2.2",
-        "vitest": "^1.2.0"
+        "turbo": "1.12",
+        "typescript": "5.3.3",
+        "vitest": "^1.2.2"
     },
     "peerDependencies": {
         "@types/react": "*",
