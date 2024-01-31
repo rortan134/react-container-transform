@@ -15,11 +15,17 @@
         "noUncheckedIndexedAccess": true,
         "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true,
+        "downlevelIteration": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "strictBindCallApply": true,
+        "noFallthroughCasesInSwitch": true,
 
         "incremental": true,
         "noEmit": true,
         "moduleResolution": "NodeNext",
         "module": "NodeNext",
+        "rootDir": "./",
         "outDir": "dist",
         "sourceMap": true,
 
@@ -28,7 +34,8 @@
         "composite": true,
         "declarationMap": true,
 
-        "lib": ["es2022", "dom", "dom.iterable"],
+        "lib": ["es2022", "dom", "dom.iterable"]
     },
+    "include": ["./src/**/*", "env.d.ts", ".eslintrc.cjs"],
     "exclude": ["node_modules"]
 }
