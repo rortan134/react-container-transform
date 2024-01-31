@@ -34,8 +34,8 @@
         "declaration": true,
         "declarationMap": true,
 
-        "lib": ["esnext", "dom", "dom.iterable"]
+        "lib": ["esnext", "dom", "dom.iterable"],
     },
     "include": ["./src/**/*", "env.d.ts", ".eslintrc.cjs"],
-    "exclude": ["node_modules"]
+    "exclude": ["node_modules"],
 }

@@ -221,10 +221,10 @@ const ContainerTransformContent = React.forwardRef<
         const [transformOrigin, setTransformOrigin] = React.useState("center");
         const [triggerComputedStyle, setTriggerComputedStyle] = React.useState<
             Partial<CSSStyleDeclaration>
-        >(() => ({} as CSSStyleDeclaration));
+        >(() => ({}) as CSSStyleDeclaration);
         const [contentComputedStyle, setContentComputedStyle] = React.useState<
             Partial<CSSStyleDeclaration>
-        >(() => ({} as CSSStyleDeclaration));
+        >(() => ({}) as CSSStyleDeclaration);
 
         useIsomorphicLayoutEffect(() => {
             const triggerElement = context.triggerRef.current;
@@ -301,7 +301,7 @@ const ContainerTransformContent = React.forwardRef<
                     overflow: "hidden",
                     position: "absolute",
                     ...style,
-                } as React.CSSProperties),
+                }) as React.CSSProperties,
             [style, transformOrigin]
         );
 
@@ -311,7 +311,6 @@ const ContainerTransformContent = React.forwardRef<
             !!contentTransitionProps.height &&
             contentTransitionProps.height > 1;
         const canAnimate = useIsPresent() && hasValidContentRect;
-        console.log(useIsPresent());
 
         return (
             <MotionSlot
