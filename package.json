@@ -1,7 +1,7 @@
 {
     "name": "react-container-transform",
-    "version": "0.0.1",
-    "description": "React container transform transition",
+    "version": "1.0.0",
+    "description": "React container transform transition. Inspired by Material Design 3. Built on top of Framer Motion.",
     "keywords": [
         "react",
         "react animation",
@@ -15,10 +15,7 @@
     "bugs": {
         "url": "https://github.com/rortan134/react-container-transform/issues"
     },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/rortan134/react-container-transform.git"
-    },
+    "repository": "github:rortan134/react-container-transform",
     "license": "MIT",
     "author": "GSMT <gsmt.dev@gmail.com>",
     "exports": {
@@ -35,60 +32,59 @@
     "module": "./dist/es/index.mjs",
     "types": "./dist/cjs/index.d.ts",
     "files": [
-        "dist",
-        "*.md"
+        "dist"
     ],
     "scripts": {
         "build": "bunchee",
         "clean": "find . -name node_modules -o -name .next -o -name .turbo -o -name dist -type d -prune | xargs rm -rf",
-        "dev": "bunchee --watch",
+        "dev": "bunchee -w",
         "dev:test": "turbo run dev --filter=test...",
-        "format": "prettier --write .",
-        "prepare": "husky install",
+        "format": "prettier --write ./**/*.{ts,tsx}",
+        "prepare": "husky",
         "test": "vitest run",
         "test:e2e": "playwright test"
     },
     "lint-staged": {
         "*.{ts,tsx}": [
-            "eslint --quiet --fix --cache",
+            "eslint --fix --cache",
             "prettier --write"
         ]
     },
     "dependencies": {
         "@radix-ui/react-slot": "^1.0.2",
         "client-only": "^0.0.1",
-        "framer-motion": "^11.0.3"
+        "framer-motion": "^11.1.9"
     },
     "devDependencies": {
-        "@playwright/test": "^1.41.1",
-        "@testing-library/jest-dom": "^6.4.0",
-        "@testing-library/react": "^14.2.0",
-        "@types/react": "^18.2.48",
-        "@typescript-eslint/eslint-plugin": "^6.20.0",
-        "@typescript-eslint/parser": "^6.20.0",
-        "bunchee": "^4.4.3",
+        "@playwright/test": "^1.44.0",
+        "@testing-library/jest-dom": "^6.4.5",
+        "@testing-library/react": "^15.0.7",
+        "@types/react": "^18.3.1",
+        "@typescript-eslint/eslint-plugin": "^7.8.0",
+        "@typescript-eslint/parser": "^7.8.0",
+        "bunchee": "^5.1.5",
         "eslint": "^8.56.0",
         "eslint-config-prettier": "^9.1.0",
-        "eslint-plugin-jest-dom": "^5.1.0",
-        "eslint-plugin-playwright": "^0.22.1",
-        "eslint-plugin-react": "^7.33.2",
-        "eslint-plugin-react-hooks": "^4.6.0",
-        "eslint-plugin-testing-library": "^6.2.0",
-        "husky": "^9.0.7",
-        "lint-staged": "^15.2.1",
-        "prettier": "^3.2.4",
-        "prettier-plugin-packagejson": "^2.4.10",
-        "react": "18.2.0",
-        "react-dom": "18.2.0",
-        "turbo": "1.12",
-        "typescript": "5.3.3",
-        "vitest": "^1.2.2"
+        "eslint-plugin-jest-dom": "^5.4.0",
+        "eslint-plugin-playwright": "^1.6.0",
+        "eslint-plugin-react": "^7.34.1",
+        "eslint-plugin-react-hooks": "^4.6.2",
+        "eslint-plugin-testing-library": "^6.2.2",
+        "husky": "^9.0.11",
+        "lint-staged": "^15.2.2",
+        "prettier": "^3.2.5",
+        "prettier-plugin-packagejson": "^2.5.0",
+        "react": "18.3.1",
+        "react-dom": "18.3.1",
+        "turbo": "1.13",
+        "typescript": "5.4.5",
+        "vitest": "^1.6.0"
     },
     "peerDependencies": {
         "@types/react": "*",
         "@types/react-dom": "*",
-        "react": "^16.11.0 || ^17.0.0 || ^18.0.0",
-        "react-dom": "^16.11.0 || ^17.0.0 || ^18.0.0"
+        "react": "^17.0.0 || ^18.0.0",
+        "react-dom": "^17.0.0 || ^18.0.0"
     },
     "peerDependenciesMeta": {
         "@types/react": {
@@ -98,9 +94,10 @@
             "optional": true
         }
     },
-    "packageManager": "pnpm@6.32.11",
+    "packageManager": "pnpm@8.15.8",
     "engines": {
         "node": ">=18.x",
         "npm": ">=9.0.0"
-    }
+    },
+    "engineStrict": true
 }

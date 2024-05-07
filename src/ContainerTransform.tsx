@@ -20,9 +20,6 @@ const DURATIONS = {
     emphasized_outgoing: 0.25,
 };
 
-const isWindowDefined = typeof window !== "undefined";
-const useIsomorphicLayoutEffect = isWindowDefined ? React.useLayoutEffect : React.useEffect;
-
 const visibleOnlyStyles = {
     pointerEvents: "none",
     position: "absolute",
@@ -32,6 +29,12 @@ const visibleOnlyStyles = {
     left: 0,
     right: 0,
 } satisfies React.CSSProperties;
+
+const STR_UNDEFINED = "undefined";
+const isWindowDefined = typeof window != STR_UNDEFINED;
+const isServer = !isWindowDefined || "Deno" in globalThis;
+
+const useIsomorphicLayoutEffect = isServer ? React.useEffect : React.useLayoutEffect;
 
 /* -------------------------------------------------------------------------------------------------
  * ContainerTransform
@@ -45,8 +48,9 @@ const [createContainerContext, createContainerScope] = createContextScope(CONTAI
 type TransformationRects = readonly [DOMRect | undefined, DOMRect | undefined]; // [trigger rect, Content rect]
 
 interface ContainerTransformContextValue {
-    triggerRef: React.RefObject<ContainerTransformTriggerElement>;
+    triggerComputedStyleRef: React.RefObject<Partial<CSSStyleDeclaration>>;
     contentMaskRef: React.RefObject<HTMLDivElement>;
+    transformOriginRef: React.RefObject<string>;
     active: boolean;
     onActiveChange(active: boolean): void;
     onActiveToggle(): void;
@@ -72,8 +76,11 @@ const ContainerTransform: React.FC<ContainerTransformProps> = ({
     onActiveChange,
     children,
 }: ScopedProps<ContainerTransformProps>) => {
-    const triggerRef = React.useRef<ContainerTransformTriggerElement>(null);
-    const contentMaskRef = React.useRef<HTMLDivElement>(null);
+    const triggerComputedStyleRef = React.useRef<Partial<CSSStyleDeclaration>>(
+        {} as CSSStyleDeclaration
+    );
+    const contentMaskRef = React.useRef<HTMLDivElement | null>(null);
+    const transformOriginRef = React.useRef("center");
     const [isActive = false, setIsActive] = useControllableState({
         prop: active,
         defaultProp: defaultActive,
@@ -87,8 +94,9 @@ const ContainerTransform: React.FC<ContainerTransformProps> = ({
     return (
         <ContainerProvider
             scope={__scopeContainer}
-            triggerRef={triggerRef}
+            triggerComputedStyleRef={triggerComputedStyleRef}
             contentMaskRef={contentMaskRef}
+            transformOriginRef={transformOriginRef}
             rects={rects || stableRectsPlaceholderRef}
             onRectsChange={setRects}
             active={isActive}
@@ -117,27 +125,34 @@ const ContainerTransformTrigger = React.forwardRef<
     ScopedProps<ContainerTransformTriggerProps>
 >(({ __scopeContainer, style, children, ...props }, forwardedRef) => {
     const context = useContainerContext(TRIGGER_NAME, __scopeContainer);
-    const composedTriggerRef = useComposedRefs(forwardedRef, context.triggerRef);
+    const composedTriggerRef = useComposedRefs(forwardedRef);
     const styles: React.CSSProperties = { ...(context.active ? { opacity: 0 } : {}), ...style };
 
-    useIsomorphicLayoutEffect(() => {
-        const contentMaskElement = context.contentMaskRef?.current;
-        if (contentMaskElement)
-            context.onRectsChange((prevRects) => [
-                contentMaskElement.getBoundingClientRect(),
-                prevRects?.[1],
-            ]);
-    }, [context.contentMaskRef]);
-
     return (
-        <Slot {...props} ref={composedTriggerRef} style={styles}>
+        <Slot
+            {...props}
+            ref={(node: HTMLElement | null) => {
+                if (node) {
+                    composedTriggerRef(node);
+                    context.triggerComputedStyleRef.current = window.getComputedStyle(node);
+                }
+            }}
+            style={styles}>
             <Slottable>{children}</Slottable>
             <div
                 // This div is used to get the trigger position and size in an absolute position reference
-                // getBoundingClientRect() doesn't seem reliable when the element is static
                 data-container-transform-trigger-mask=""
-                ref={context.contentMaskRef}
+                ref={React.useCallback((node: HTMLDivElement | null) => {
+                    if (node) {
+                        context.contentMaskRef.current = node;
+                        const clientRect = node.getBoundingClientRect();
+                        // Find in which corner of the window the trigger is
+                        context.transformOriginRef.current = getTransformOrigin(clientRect);
+                        context.onRectsChange((prevRects) => [clientRect, prevRects?.[1]]);
+                    }
+                }, [])}
                 style={visibleOnlyStyles}
+                aria-hidden="true"
             />
         </Slot>
     );
@@ -168,29 +183,25 @@ const PortalPrimitive = React.forwardRef<
 });
 PortalPrimitive.displayName = PORTAL_NAME;
 
-const ContainerTransformPortal: React.FC<ContainerTransformPortalProps> = ({
-    __scopeContainer,
-    container,
-    children,
-}: ScopedProps<ContainerTransformPortalProps>) => {
-    useContainerContext(PORTAL_NAME, __scopeContainer);
+const ContainerTransformPortal: React.FC<ContainerTransformPortalProps> = React.forwardRef<
+    ContainerTransformPortalElement,
+    ScopedProps<ContainerTransformPortalProps>
+>(({ __scopeContainer, container, children }, forwardedRef) => {
+    const context = useContainerContext(PORTAL_NAME, __scopeContainer);
+
     return React.Children.map(children, (child) => (
-        <PortalPrimitive container={container}>
-            <AnimatePresence initial={false} mode="popLayout">
-                {child}
-            </AnimatePresence>
+        <PortalPrimitive container={container} ref={forwardedRef}>
+            <AnimatePresence mode="wait">{child}</AnimatePresence>
         </PortalPrimitive>
     ));
-};
+});
 ContainerTransformPortal.displayName = PORTAL_NAME;
-
-/* -----------------------------------------------------------------------------------------------*/
-
-const MotionSlot = motion(Slot);
 
 /* -------------------------------------------------------------------------------------------------
  * ContainerTransformContent
  * -----------------------------------------------------------------------------------------------*/
+
+const MotionSlot = motion(Slot);
 
 const CONTENT_NAME = "ContainerTransformContent";
 
@@ -204,6 +215,11 @@ interface ContainerTransformContentProps extends React.ComponentPropsWithoutRef<
      * @default false
      */
     dismissOnSwipe?: boolean;
+    /**
+     * The direction in which the user can swipe to dismiss the container transformation.
+     * @default "down"
+     */
+    swipeDirection?: "up" | "down" | "left" | "right" | "any";
 }
 
 const ContainerTransformContent = React.forwardRef<
@@ -211,81 +227,76 @@ const ContainerTransformContent = React.forwardRef<
     ScopedProps<ContainerTransformContentProps>
 >(
     (
-        { __scopeContainer, transition, dismissOnSwipe = false, style, children, ...props },
+        {
+            __scopeContainer,
+            transition,
+            dismissOnSwipe = false,
+            swipeDirection = "down",
+            style,
+            children,
+            ...props
+        },
         forwardedRef
     ) => {
         const context = useContainerContext(CONTENT_NAME, __scopeContainer);
-        const contentRef = React.useRef<ContainerTransformContentElement>(null);
+        const contentRef = React.useRef<ContainerTransformContentElement | null>(null);
         const composedRefs = useComposedRefs(forwardedRef, contentRef);
+        const lastKnownContentBoundingClientRect = React.useRef<DOMRect | null>(null);
+        const contentComputedStyleRef = React.useRef<Partial<CSSStyleDeclaration>>(
+            {} as CSSStyleDeclaration
+        );
 
-        const [transformOrigin, setTransformOrigin] = React.useState("center");
-        const [triggerComputedStyle, setTriggerComputedStyle] = React.useState<
-            Partial<CSSStyleDeclaration>
-        >(() => ({}) as CSSStyleDeclaration);
-        const [contentComputedStyle, setContentComputedStyle] = React.useState<
-            Partial<CSSStyleDeclaration>
-        >(() => ({}) as CSSStyleDeclaration);
+        const styles: React.CSSProperties = {
+            overflow: "hidden",
+            position: "absolute",
+            transformOrigin: context.transformOriginRef.current ?? "center",
+            ...style,
+        };
 
-        useIsomorphicLayoutEffect(() => {
-            const triggerElement = context.triggerRef.current;
-            if (triggerElement) {
-                setTriggerComputedStyle(window.getComputedStyle(triggerElement));
-                // Find in which corner of the window the trigger is
-                setTransformOrigin(getTransformOrigin(triggerElement.getBoundingClientRect()));
-            }
-            const contentElement = contentRef.current;
-            if (contentElement) {
-                setContentComputedStyle(window.getComputedStyle(contentElement));
-                context.onRectsChange((prevRects) => [
-                    prevRects?.[0],
-                    contentElement.getBoundingClientRect(),
-                ]);
-            }
-            return () => context.onRectsChange((prevRects) => [prevRects?.[0], undefined]);
-        }, []);
-
-        const swipeConstraints = useSwipeConstraints(contentRef);
-
-        function checkSwipeToDismiss() {
-            const contentElement = contentRef.current;
-            if (!contentElement) return;
-            const offset = contentElement.getBoundingClientRect().y;
-            if (dismissOnSwipe && offset > offset + DISMISS_CONTENT_SWIPE_DISTANCE) {
-                context.onActiveToggle();
-            }
-        }
+        React.useLayoutEffect(() => {
+            const content = contentRef?.current;
+            if (!isWindowDefined || !content || !lastKnownContentBoundingClientRect.current) return;
+            context.onRectsChange((prevRects) => [
+                prevRects?.[0],
+                lastKnownContentBoundingClientRect.current ?? undefined,
+            ]);
+        }, [context.active]);
 
         const initialTransitionProps = {
-            // @ts-ignore weird type error
-            top: 0,
             left: 0,
-            width: context.rects[0]?.width,
-            height: context.rects[0]?.height,
-            transform: `translateX(${context.rects[0]?.x}px) translateY(${context.rects[0]?.y}px) translateY(0)`,
-            padding: triggerComputedStyle.padding,
-            backgroundColor: triggerComputedStyle.backgroundColor ?? "rgb(0,0,0,0)",
-            borderRadius: triggerComputedStyle.borderRadius,
+            top: 0,
+            width: context.rects[0]?.width ?? 0,
+            height: context.rects[0]?.height ?? 0,
+            // transform: `translateX(${context.rects[0]?.x}px) translateY(${context.rects[0]?.y}px) translateY(0)`,
+            x: context.rects[0]?.x ?? 0,
+            y: context.rects[0]?.y ?? 0,
+            padding: context.triggerComputedStyleRef.current?.padding ?? 0,
+            backgroundColor:
+                context.triggerComputedStyleRef.current?.backgroundColor ?? "rgb(0,0,0,0)",
+            borderRadius: context.triggerComputedStyleRef.current?.borderRadius ?? 0,
         } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["initial"];
 
         const contentTransitionProps = {
-            // @ts-ignore weird type error
-            top: 0,
             left: 0,
-            width: context.rects[1]?.width,
-            height: context.rects[1]?.height,
-            transform: `translateX(${context.rects[1]?.x}px) translateY(${context.rects[1]?.y}px) translateY(0)`,
-            padding: contentComputedStyle.padding,
-            backgroundColor: contentComputedStyle.backgroundColor ?? "rgb(0,0,0,0)",
-            borderRadius: contentComputedStyle.borderRadius,
+            top: 0,
+            width: context.rects[1]?.width ?? 0,
+            height: context.rects[1]?.height ?? 0,
+            // transform: `translateX(${context.rects[1]?.x}px) translateY(${context.rects[1]?.y}px) translateY(0)`,
+            x: context.rects[0]?.x ?? 0,
+            y: context.rects[1]?.y ?? 0,
+            padding: contentComputedStyleRef.current.padding ?? 0,
+            backgroundColor: contentComputedStyleRef.current.backgroundColor ?? "rgb(0,0,0,0)",
+            borderRadius: contentComputedStyleRef.current.borderRadius ?? 0,
         } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["animate"];
 
         const animationKeyframes = {
-            // @ts-ignore weird type error
             top: [initialTransitionProps.top, contentTransitionProps.top],
             left: [initialTransitionProps.left, contentTransitionProps.left],
             width: [initialTransitionProps.width, contentTransitionProps.width],
             height: [initialTransitionProps.height, contentTransitionProps.height],
-            transform: [initialTransitionProps.transform, contentTransitionProps.transform],
+            // transform: [initialTransitionProps.transform, contentTransitionProps.transform],
+            x: [initialTransitionProps.x, contentTransitionProps.x],
+            y: [initialTransitionProps.y, contentTransitionProps.y],
             padding: [initialTransitionProps.padding, contentTransitionProps.padding],
             backgroundColor: [
                 initialTransitionProps.backgroundColor,
@@ -297,37 +308,62 @@ const ContainerTransformContent = React.forwardRef<
             ],
         } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["animate"];
 
-        const styles = React.useMemo(
-            () =>
-                ({
-                    transformOrigin,
-                    overflow: "hidden",
-                    position: "absolute",
-                    ...style,
-                }) as React.CSSProperties,
-            [style, transformOrigin]
-        );
-
         const hasValidContentRect =
             !!contentTransitionProps.width &&
             contentTransitionProps.width > 1 &&
             !!contentTransitionProps.height &&
             contentTransitionProps.height > 1;
-        const canAnimate = useIsPresent() && hasValidContentRect;
+
+        const hasUnequalContentRect =
+            contentTransitionProps.width !== initialTransitionProps.width &&
+            contentTransitionProps.height !== initialTransitionProps.height &&
+            contentTransitionProps.x !== initialTransitionProps.x;
+
+        // const canAnimate = useIsPresent() && hasValidContentRect;
+
+        React.useEffect(() => {
+            console.log(animationKeyframes, hasUnequalContentRect);
+        }, [animationKeyframes, hasUnequalContentRect]);
+
+        /* -----------------------------------------------------------------------------------------------*/
+
+        // const swipeConstraints = useSwipeConstraints(contentRef);
+
+        // const checkSwipeToDismiss = React.useCallback(() => {
+        //     const offset = context.rects[1]?.y;
+        //     if (offset && dismissOnSwipe && offset > offset + DISMISS_CONTENT_SWIPE_DISTANCE) {
+        //         context.onActiveToggle();
+        //     }
+        // }, [dismissOnSwipe]);
 
         return (
             <MotionSlot
                 {...props}
-                ref={composedRefs}
+                ref={React.useCallback(
+                    (node: HTMLElement | null) => {
+                        if (node) {
+                            composedRefs(node);
+                            contentComputedStyleRef.current = window.getComputedStyle(node);
+                            lastKnownContentBoundingClientRect.current =
+                                node.getBoundingClientRect();
+                            // context.onRectsChange((prevRects) => [
+                            //     prevRects?.[0],
+                            //     node.getBoundingClientRect(),
+                            // ]);
+                        }
+                    },
+                    [composedRefs]
+                )}
                 layout="preserve-aspect"
+                // key={context.active}
                 layoutId="container-transform-content"
-                layoutDependency={context.rects}
-                animate={canAnimate && animationKeyframes}
-                exit={initialTransitionProps}
-                drag={dismissOnSwipe ? "y" : false}
-                onDrag={checkSwipeToDismiss}
-                dragConstraints={swipeConstraints}
-                dragElastic={0.2}
+                // initial={hasUnequalContentRect ? initialTransitionProps : {}}
+                animate={context.active ? (hasUnequalContentRect ? animationKeyframes : {}) : {}}
+                // exit={initialTransitionProps}
+                // drag={dismissOnSwipe ? "y" : false}
+                // onDrag={checkSwipeToDismiss}
+                // dragConstraints={swipeConstraints}
+                // dragElastic={0.2}
                 style={styles}
                 transition={{
                     ease: EASINGS.emphasized,
@@ -339,12 +375,12 @@ const ContainerTransformContent = React.forwardRef<
                     ...transition,
                 }}>
                 <Slottable>{children}</Slottable>
-                {canAnimate ? (
-                    <ContainerTransformContentMask
-                        triggerBackgroundColor={triggerComputedStyle.backgroundColor}
-                        contentBackgroundColor={contentComputedStyle.backgroundColor}
-                    />
-                ) : null}
+                <ContainerTransformContentMask
+                    triggerBackgroundColor={
+                        context.triggerComputedStyleRef.current?.backgroundColor
+                    }
+                    contentBackgroundColor={contentComputedStyleRef.current.backgroundColor}
+                />
             </MotionSlot>
         );
     }
@@ -362,8 +398,8 @@ const ContainerTransformContentMask = React.memo(
         triggerBackgroundColor,
         contentBackgroundColor,
     }: {
-        triggerBackgroundColor: string | undefined;
-        contentBackgroundColor: string | undefined;
+        triggerBackgroundColor: string | undefined | null;
+        contentBackgroundColor: string | undefined | null;
     }) => {
         return (
             <motion.div
@@ -371,7 +407,6 @@ const ContainerTransformContentMask = React.memo(
                 data-container-transform-content-mask=""
                 initial={{
                     opacity: 1,
-                    // @ts-ignore weird type error
                     backgroundColor: triggerBackgroundColor ?? "rgb(0,0,0,0)",
                 }}
                 animate={{
@@ -398,7 +433,7 @@ ContainerTransformContentMask.displayName = CONTENT_MASK_NAME;
 
 /* -----------------------------------------------------------------------------------------------*/
 
-function getTransformOrigin(rect: DOMRectReadOnly) {
+const getTransformOrigin = (rect: DOMRectReadOnly) => {
     const triggerCenterX = rect.left + rect.width / 2;
     const triggerCenterY = rect.top + rect.height / 2;
     const windowCenterX = window.innerWidth / 2;
@@ -407,7 +442,7 @@ function getTransformOrigin(rect: DOMRectReadOnly) {
     const isTriggerOnLeft = triggerCenterX < windowCenterX;
     // TODO: refactor to use relative units instead of left/right/top/bottom values
     return `${isTriggerOnTop ? "top" : "bottom"} ${isTriggerOnLeft ? "left" : "right"}`;
-}
+};
 
 /**
  * Calculate the top/bottom scroll constraints of a full-screen element vs the viewport
@@ -425,13 +460,14 @@ function useSwipeConstraints(targetRef: React.RefObject<HTMLElement | SVGElement
         top: 0,
     });
 
-    React.useEffect(() => {
+    useIsomorphicLayoutEffect(() => {
         const element = targetRef.current as HTMLElement;
         if (!element) return;
         const viewportHeight = window.innerHeight;
         const contentTop = element.offsetTop;
         const scrollableViewport = viewportHeight - contentTop * 2;
         const contentHeight = element.offsetHeight;
+
         setConstraints((prevConstraints) => ({
             ...prevConstraints,
             top: Math.min(scrollableViewport - contentHeight, 0),
