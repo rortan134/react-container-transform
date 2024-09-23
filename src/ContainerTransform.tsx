@@ -1,5 +1,5 @@
 import { Slot, Slottable } from "@radix-ui/react-slot";
-import { AnimatePresence, motion, useIsPresent } from "framer-motion";
+import { AnimatePresence, motion, LayoutGroup } from "framer-motion";
 import * as React from "react";
 import ReactDOM from "react-dom";
 import { createContextScope } from "./utils/createContext";
@@ -187,11 +187,11 @@ const ContainerTransformPortal: React.FC<ContainerTransformPortalProps> = React.
     ContainerTransformPortalElement,
     ScopedProps<ContainerTransformPortalProps>
 >(({ __scopeContainer, container, children }, forwardedRef) => {
-    const context = useContainerContext(PORTAL_NAME, __scopeContainer);
-
+    // Guard against the case where the context is not available
+    useContainerContext(PORTAL_NAME, __scopeContainer);
     return React.Children.map(children, (child) => (
         <PortalPrimitive container={container} ref={forwardedRef}>
-            <AnimatePresence mode="wait">{child}</AnimatePresence>
+            <LayoutGroup>{child}</LayoutGroup>
         </PortalPrimitive>
     ));
 });
@@ -219,7 +219,7 @@ interface ContainerTransformContentProps extends React.ComponentPropsWithoutRef<
      * The direction in which the user can swipe to dismiss the container transformation.
      * @default "down"
      */
-    swipeDirection?: "up" | "down" | "left" | "right" | "any";
+    swipeDirection?: "up" | "down" | "left" | "right" | "x" | "y" | "any";
 }
 
 const ContainerTransformContent = React.forwardRef<
@@ -250,80 +250,53 @@ const ContainerTransformContent = React.forwardRef<
             overflow: "hidden",
             position: "absolute",
             transformOrigin: context.transformOriginRef.current ?? "center",
+            // left: 0,
+            // top: 0,
             ...style,
         };
 
-        React.useLayoutEffect(() => {
+        useIsomorphicLayoutEffect(() => {
             const content = contentRef?.current;
-            if (!isWindowDefined || !content || !lastKnownContentBoundingClientRect.current) return;
+            if (!isWindowDefined || !content || !context.active) {
+                return;
+            }
             context.onRectsChange((prevRects) => [
                 prevRects?.[0],
-                lastKnownContentBoundingClientRect.current ?? undefined,
+                prevRects?.[1] ?? lastKnownContentBoundingClientRect.current ?? undefined,
             ]);
         }, [context.active]);
 
-        const initialTransitionProps = {
-            left: 0,
-            top: 0,
-            width: context.rects[0]?.width ?? 0,
-            height: context.rects[0]?.height ?? 0,
-            // transform: `translateX(${context.rects[0]?.x}px) translateY(${context.rects[0]?.y}px) translateY(0)`,
-            x: context.rects[0]?.x ?? 0,
-            y: context.rects[0]?.y ?? 0,
-            padding: context.triggerComputedStyleRef.current?.padding ?? 0,
-            backgroundColor:
-                context.triggerComputedStyleRef.current?.backgroundColor ?? "rgb(0,0,0,0)",
-            borderRadius: context.triggerComputedStyleRef.current?.borderRadius ?? 0,
-        } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["initial"];
+        // const animationKeyframes = {
+        //     top: [initialTransitionProps.top, contentTransitionProps.top],
+        //     left: [initialTransitionProps.left, contentTransitionProps.left],
+        //     width: [initialTransitionProps.width, contentTransitionProps.width],
+        //     height: [initialTransitionProps.height, contentTransitionProps.height],
+        //     // transform: [initialTransitionProps.transform, contentTransitionProps.transform],
+        //     x: [initialTransitionProps.x, contentTransitionProps.x],
+        //     y: [initialTransitionProps.y, contentTransitionProps.y],
+        //     padding: [initialTransitionProps.padding, contentTransitionProps.padding],
+        //     backgroundColor: [
+        //         initialTransitionProps.backgroundColor,
+        //         contentTransitionProps.backgroundColor,
+        //     ],
+        //     borderRadius: [
+        //         initialTransitionProps.borderRadius,
+        //         contentTransitionProps.borderRadius,
+        //     ],
+        // } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["animate"];
 
-        const contentTransitionProps = {
-            left: 0,
-            top: 0,
-            width: context.rects[1]?.width ?? 0,
-            height: context.rects[1]?.height ?? 0,
-            // transform: `translateX(${context.rects[1]?.x}px) translateY(${context.rects[1]?.y}px) translateY(0)`,
-            x: context.rects[0]?.x ?? 0,
-            y: context.rects[1]?.y ?? 0,
-            padding: contentComputedStyleRef.current.padding ?? 0,
-            backgroundColor: contentComputedStyleRef.current.backgroundColor ?? "rgb(0,0,0,0)",
-            borderRadius: contentComputedStyleRef.current.borderRadius ?? 0,
-        } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["animate"];
-
-        const animationKeyframes = {
-            top: [initialTransitionProps.top, contentTransitionProps.top],
-            left: [initialTransitionProps.left, contentTransitionProps.left],
-            width: [initialTransitionProps.width, contentTransitionProps.width],
-            height: [initialTransitionProps.height, contentTransitionProps.height],
-            // transform: [initialTransitionProps.transform, contentTransitionProps.transform],
-            x: [initialTransitionProps.x, contentTransitionProps.x],
-            y: [initialTransitionProps.y, contentTransitionProps.y],
-            padding: [initialTransitionProps.padding, contentTransitionProps.padding],
-            backgroundColor: [
-                initialTransitionProps.backgroundColor,
-                contentTransitionProps.backgroundColor,
-            ],
-            borderRadius: [
-                initialTransitionProps.borderRadius,
-                contentTransitionProps.borderRadius,
-            ],
-        } satisfies React.ComponentPropsWithoutRef<typeof motion.div>["animate"];
-
-        const hasValidContentRect =
-            !!contentTransitionProps.width &&
-            contentTransitionProps.width > 1 &&
-            !!contentTransitionProps.height &&
-            contentTransitionProps.height > 1;
-
-        const hasUnequalContentRect =
-            contentTransitionProps.width !== initialTransitionProps.width &&
-            contentTransitionProps.height !== initialTransitionProps.height &&
-            contentTransitionProps.x !== initialTransitionProps.x;
-
-        // const canAnimate = useIsPresent() && hasValidContentRect;
-
-        React.useEffect(() => {
-            console.log(animationKeyframes, hasUnequalContentRect);
-        }, [animationKeyframes, hasUnequalContentRect]);
+        const refHandler = React.useCallback(
+            (node: HTMLElement | null) => {
+                if (node) {
+                    composedRefs(node);
+                    contentComputedStyleRef.current = window.getComputedStyle(node);
+                    if (!lastKnownContentBoundingClientRect.current)
+                        lastKnownContentBoundingClientRect.current = node.getBoundingClientRect();
+                }
+                return () => context.onRectsChange((prevRects) => [prevRects?.[0], undefined]);
+            },
+            [composedRefs, context.onRectsChange]
+        );
 
         /* -----------------------------------------------------------------------------------------------*/
 
@@ -336,52 +309,90 @@ const ContainerTransformContent = React.forwardRef<
         //     }
         // }, [dismissOnSwipe]);
 
+        const { height, width, x, y } = context.rects[0] ?? {};
+        const {
+            x: x2,
+            y: y2,
+            top,
+            left,
+            height: contentHeight,
+            width: contentWidth,
+        } = context.rects[1] ?? {};
+
+        console.log(x2, y2, x, y);
+
         return (
-            <MotionSlot
-                {...props}
-                ref={React.useCallback(
-                    (node: HTMLElement | null) => {
-                        if (node) {
-                            composedRefs(node);
-                            contentComputedStyleRef.current = window.getComputedStyle(node);
-                            lastKnownContentBoundingClientRect.current =
-                                node.getBoundingClientRect();
-                            // context.onRectsChange((prevRects) => [
-                            //     prevRects?.[0],
-                            //     node.getBoundingClientRect(),
-                            // ]);
-                        }
-                    },
-                    [composedRefs]
+            <AnimatePresence mode="wait">
+                {context.active && (
+                    <MotionSlot
+                        {...props}
+                        ref={refHandler}
+                        layout="preserve-aspect"
+                        layoutId="container-transform-content"
+                        initial={{
+                            height,
+                            width,
+                            // top: 0,
+                            // left: 0 ,
+                            x: x ? `${x}px` : undefined,
+                            y: y ? `${y}px` : undefined,
+                            padding: context.triggerComputedStyleRef.current?.padding ?? 0,
+                            backgroundColor:
+                                context.triggerComputedStyleRef.current?.backgroundColor ??
+                                "rgb(0,0,0,0)",
+                            borderRadius:
+                                context.triggerComputedStyleRef.current?.borderRadius ?? 0,
+                        }}
+                        // animate={{
+                        //     height: contentHeight,
+                        //     width: contentHeight,
+                        //     x: "-50%",
+                        //     y: "-50%",
+                        //     // top,
+                        //     // left,
+                        //     // x: x2,
+                        //     // y: y2,
+                        //     padding: contentComputedStyleRef.current.padding ?? 0,
+                        //     backgroundColor:
+                        //         contentComputedStyleRef.current.backgroundColor ?? "rgb(0,0,0,0)",
+                        //     borderRadius: contentComputedStyleRef.current.borderRadius ?? 0,
+                        // }}
+                        exit={{
+                            width,
+                            height,
+                            // x: `${context.rects[0]?.x ?? 0}px`,
+                            // y: `${context.rects[0]?.y ?? 0}px`,
+                            padding: context.triggerComputedStyleRef.current?.padding ?? 0,
+                            backgroundColor:
+                                context.triggerComputedStyleRef.current?.backgroundColor ??
+                                "rgb(0,0,0,0)",
+                            borderRadius:
+                                context.triggerComputedStyleRef.current?.borderRadius ?? 0,
+                        }}
+                        // drag={dismissOnSwipe ? "y" : false}
+                        // onDrag={checkSwipeToDismiss}
+                        // dragConstraints={swipeConstraints}
+                        // dragElastic={0.2}
+                        style={styles}
+                        transition={{
+                            ease: EASINGS.emphasized,
+                            duration: DURATIONS.emphasized,
+                            backgroundColor: {
+                                ease: EASINGS.emphasized_accelerate,
+                                duration: DURATIONS.emphasized_accelerate,
+                            },
+                            ...transition,
+                        }}>
+                        <Slottable>{children}</Slottable>
+                        <ContainerTransformContentMask
+                            triggerBackgroundColor={
+                                context.triggerComputedStyleRef.current?.backgroundColor
+                            }
+                            contentBackgroundColor={contentComputedStyleRef.current.backgroundColor}
+                        />
+                    </MotionSlot>
                 )}
-                layout="preserve-aspect"
-                // key={context.active}
-                layoutId="container-transform-content"
-                // initial={hasUnequalContentRect ? initialTransitionProps : {}}
-                animate={context.active ? (hasUnequalContentRect ? animationKeyframes : {}) : {}}
-                // exit={initialTransitionProps}
-                // drag={dismissOnSwipe ? "y" : false}
-                // onDrag={checkSwipeToDismiss}
-                // dragConstraints={swipeConstraints}
-                // dragElastic={0.2}
-                style={styles}
-                transition={{
-                    ease: EASINGS.emphasized,
-                    duration: DURATIONS.emphasized,
-                    backgroundColor: {
-                        ease: EASINGS.emphasized_accelerate,
-                        duration: DURATIONS.emphasized_accelerate,
-                    },
-                    ...transition,
-                }}>
-                <Slottable>{children}</Slottable>
-                <ContainerTransformContentMask
-                    triggerBackgroundColor={
-                        context.triggerComputedStyleRef.current?.backgroundColor
-                    }
-                    contentBackgroundColor={contentComputedStyleRef.current.backgroundColor}
-                />
-            </MotionSlot>
+            </AnimatePresence>
         );
     }
 );
@@ -483,22 +494,22 @@ const Portal = ContainerTransformPortal;
 const Content = ContainerTransformContent;
 
 export {
-    createContainerScope,
     //
     ContainerTransform,
-    ContainerTransformTrigger,
-    ContainerTransformPortal,
     ContainerTransformContent,
+    ContainerTransformPortal,
+    ContainerTransformTrigger,
+    Content,
+    Portal,
     //
     Root,
     Trigger,
-    Portal,
-    Content,
+    createContainerScope,
 };
 
 export type {
+    ContainerTransformContentProps,
+    ContainerTransformPortalProps,
     ContainerTransformProps,
     ContainerTransformTriggerProps,
-    ContainerTransformPortalProps,
-    ContainerTransformContentProps,
 };
