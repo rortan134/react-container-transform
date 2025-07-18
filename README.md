@@ -1,3 +1,3 @@
-# Native-like, stupid simple container transformations on the web
+# Container transformations on the web
 
 TODO
